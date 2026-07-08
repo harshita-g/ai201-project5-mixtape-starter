@@ -71,7 +71,7 @@ I added notification creation to `rate_song()` after the rating is saved. The fu
 
 ### How I reproduced it
 
-I inspected the playlist songs endpoint by tracing `GET /playlists/<playlist_id>/songs`. The reported behavior was that a playlist with multiple songs returned one fewer song than expected, and the missing song was always the most recently added song.
+I tested the playlist songs endpoint by calling `GET /playlists/<playlist_id>/songs` for a seeded playlist and comparing the returned `count` and song list against the expected playlist contents. The endpoint returned one fewer song than expected. After tracing the playlist order, I confirmed that the missing song was the last song in the ordered list. This matched the reported behavior where the most recently added song was always hidden.
 
 ### How I found the root cause
 
@@ -84,3 +84,7 @@ The function was intentionally or accidentally dropping the last item from the l
 ### My fix and side-effect check
 
 I changed the return statement to iterate over `songs` instead of `songs[:-1]`, so every song returned by the database query is included in the API response. I checked that the ordering logic was unchanged and that the endpoint still returns songs in ascending playlist position.
+
+
+# Screenshot of git log --oneline
+![alt text](image.png)
