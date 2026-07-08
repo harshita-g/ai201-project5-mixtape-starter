@@ -48,3 +48,21 @@ The search query joined songs to the `song_tags` table. Since a single song can 
 ### My fix and side-effect check
 
 I removed the unnecessary outer join from the search query because the endpoint only searches by song title and artist. This keeps each matching song represented once while still allowing `song.to_dict()` to include the song’s tag data. After the change, I retested the search endpoint and confirmed that matching songs still appear and duplicate entries are not returned.
+
+## Issue #4 — I got notified when a friend added my song to a playlist but not when they rated it
+
+### How I reproduced it
+
+I tested the rating endpoint by sending a `POST` request to `/songs/<song_id>/rate` using a user who was not the original sharer of the song. The rating was saved successfully, but when I checked the original sharer’s notifications using `GET /users/<user_id>/notifications`, no new notification appeared for the rating.
+
+### How I found the root cause
+
+I started from `routes/songs.py` and found that the rating route calls `rate_song(user_id, song_id, int(score))` from `services/notification_service.py`. I compared `rate_song()` with the existing `add_to_playlist()` function in the same file. `add_to_playlist()` created a notification for the song’s original sharer, but `rate_song()` only saved the rating and returned it.
+
+### The root cause
+
+The rating workflow had no notification creation step. The app saved or updated the `Rating` record, but it never called `create_notification()` after a user rated someone else’s shared song. Because of that missing service-layer behavior, the rating existed in the database but no notification was created for the original sharer.
+
+### My fix and side-effect check
+
+I added notification creation to `rate_song()` after the rating is saved. The function now checks whether the rater is different from the original sharer and creates a `song_rated` notification for the sharer. I retested the rating endpoint and then checked the sharer’s notifications to confirm that a rating notification is now created. I also kept the self-rating check so users do not receive notifications for rating their own shared songs.
