@@ -66,3 +66,21 @@ The rating workflow had no notification creation step. The app saved or updated 
 ### My fix and side-effect check
 
 I added notification creation to `rate_song()` after the rating is saved. The function now checks whether the rater is different from the original sharer and creates a `song_rated` notification for the sharer. I retested the rating endpoint and then checked the sharer’s notifications to confirm that a rating notification is now created. I also kept the self-rating check so users do not receive notifications for rating their own shared songs.
+
+## Issue #5 — The last song in a playlist never shows up
+
+### How I reproduced it
+
+I inspected the playlist songs endpoint by tracing `GET /playlists/<playlist_id>/songs`. The reported behavior was that a playlist with multiple songs returned one fewer song than expected, and the missing song was always the most recently added song.
+
+### How I found the root cause
+
+I started from `routes/playlists.py`, where the `/playlists/<playlist_id>/songs` route calls `get_playlist_songs(playlist_id)` from `services/playlist_service.py`. In `get_playlist_songs()`, I found that the database query correctly fetched songs ordered by playlist position, but the return statement sliced the result list with `songs[:-1]`.
+
+### The root cause
+
+The function was intentionally or accidentally dropping the last item from the list before returning it. In Python, `songs[:-1]` returns every element except the final one. Since playlist songs are ordered by position, the final item is the most recently added song, so the endpoint always hid the newest playlist song.
+
+### My fix and side-effect check
+
+I changed the return statement to iterate over `songs` instead of `songs[:-1]`, so every song returned by the database query is included in the API response. I checked that the ordering logic was unchanged and that the endpoint still returns songs in ascending playlist position.
